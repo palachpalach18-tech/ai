@@ -1,0 +1,359 @@
+queue_on_teleport("loadstring(game:HttpGet(''))()")
+
+local ReplicatedStorageService = game:GetService("ReplicatedStorage")
+local CollectionService = game:GetService("CollectionService")
+local TeleportService = game:GetService("TeleportService")
+local PlayersService = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local WorkSpace = game:GetService("Workspace")
+
+local LocalPlayer = PlayersService.LocalPlayer
+
+local DefaultRemotePath = ReplicatedStorageService:WaitForChild("rbxts_include"):WaitForChild("node_modules"):WaitForChild("@rbxts"):WaitForChild("net"):WaitForChild("out"):WaitForChild("_NetManaged")
+
+local BedwarsRemotes = {
+	BedwarsPurchaseItemRemote = DefaultRemotePath:WaitForChild("BedwarsPurchaseItem"),
+	BlockPlacingRemote = ReplicatedStorageService:WaitForChild("rbxts_include"):WaitForChild("node_modules"):WaitForChild("@easy-games"):WaitForChild("block-engine"):WaitForChild("node_modules"):WaitForChild("@rbxts"):WaitForChild("net"):WaitForChild("out"):WaitForChild("_NetManaged"):WaitForChild("PlaceBlock"),
+	JoinQueueRemote = ReplicatedStorageService:WaitForChild("events-@easy-games/lobby:shared/event/lobby-events@getEvents.Events"):WaitForChild("joinQueue")
+}
+
+local ClientStore = require(LocalPlayer.PlayerScripts.TS.ui.store).ClientStore
+
+local AnticheatConstants = {
+	MAX_IDLE_TELEPORT_DISTANCE = 27.7,
+	MIN_IDLE_BEFORE_TELEPORT = 0.85,
+	MAX_CONTINUOUS_FLY_TIME = 2.5,
+	MAX_CONTINUOUS_SPEED = (2101 / 90),
+}
+
+local AlSploitAutowinTable = {
+	State = 1
+}
+
+if not shared.AlSploitAutowinTable then
+	shared.AlSploitAutowinTable = AlSploitAutowinTable
+else
+	AlSploitAutowinTable = shared.AlSploitAutowinTable
+end
+
+pcall(function()
+	if LocalPlayer.leaderstats.Wins.Value then
+		AlSploitAutowinTable.State = 0
+	end
+end)
+
+pcall(function()
+	if #PlayersService:GetPlayers() < 2 then
+		AlSploitAutowinTable.State = 2
+	end
+end)
+
+print(AlSploitAutowinTable.State)
+
+local function TeleportToEmptyGame()	
+	AlSploitAutowinTable.State = 2
+
+	shared.AlSploitAutowinTable = AlSploitAutowinTable
+	TeleportService:Teleport(game.PlaceId, LocalPlayer, TeleportService:GetLocalPlayerTeleportData())
+end
+
+local function TeleportToGame()
+	AlSploitAutowinTable.State = 1
+	
+	shared.AlSploitAutowinTable = AlSploitAutowinTable
+	BedwarsRemotes.JoinQueueRemote:FireServer({queueType = "bedwars_lucky_block_to2"})
+end
+
+local function GetMatchState()
+	return ClientStore:getState().Game.matchState
+end
+
+local function IsAlive(Player)
+	if not Player.Character then return false end
+	if not Player.Character:FindFirstChildOfClass("Humanoid") then return false end
+	if Player.Character:GetAttribute("Health") <= 0 then return false end
+	if not Player.Character.PrimaryPart then return false end	
+
+	return true
+end	
+
+local function Autowin()
+	local function FindNearestIronDrop(MaxDistance)
+		local NearestIronDistance = MaxDistance or math.huge
+		local NearestIron
+
+		for i, v in next, WorkSpace:FindFirstChild("ItemDrops"):GetChildren() do
+			if v.Name == "iron" then
+				local Distance = (v.Position - LocalPlayer.Character.PrimaryPart.Position).Magnitude
+
+				if Distance < NearestIronDistance then
+					NearestIronDistance = Distance
+					NearestIron = v
+				end
+			end
+		end
+
+		return NearestIron, NearestIronDistance
+	end
+	
+	local function TeleportEfficiently(StartPosition, EndPosition)
+		local Distance = (EndPosition - StartPosition).Magnitude
+
+		local AdvantageousStrategy
+
+		if Distance < AnticheatConstants.MAX_IDLE_TELEPORT_DISTANCE and (AnticheatConstants.MIN_IDLE_BEFORE_TELEPORT + 0.1) <= Distance / AnticheatConstants.MAX_CONTINUOUS_SPEED then	
+			LocalPlayer.Character.PrimaryPart.Anchored = true
+
+			task.wait(AnticheatConstants.MIN_IDLE_BEFORE_TELEPORT)
+
+			LocalPlayer.Character.PrimaryPart.Anchored = false
+
+			local TweenInformation = TweenInfo.new(0.1, Enum.EasingStyle.Linear, Enum.EasingDirection.Out, 0, false, 0)
+			local MouseTpTween = TweenService:Create(LocalPlayer.Character.PrimaryPart, TweenInformation, {CFrame = CFrame.new(EndPosition)})
+
+			MouseTpTween:Play()
+		else
+			local StartPosition = LocalPlayer.Character.PrimaryPart.Position
+			local LookDirection = EndPosition - StartPosition
+
+			local Distance = LookDirection.Magnitude
+			local Direction = LookDirection.Unit
+
+			local MaxSpeed = AnticheatConstants.MAX_CONTINUOUS_SPEED
+			local MaxTime = AnticheatConstants.MAX_CONTINUOUS_FLY_TIME
+
+			local MaxDistanceByTime = MaxSpeed * MaxTime
+			local TravelDistance = math.min(Distance, MaxDistanceByTime)
+
+			local TweenTime = TravelDistance / MaxSpeed
+
+			TweenTime = math.min(TweenTime, MaxTime)
+
+			local TargetPosition = StartPosition + (Direction * TravelDistance)
+
+			local TweenInformation = TweenInfo.new(
+				TweenTime,
+				Enum.EasingStyle.Linear,
+				Enum.EasingDirection.Out
+			)
+
+			local MouseTpTween = TweenService:Create(
+				LocalPlayer.Character.PrimaryPart,
+				TweenInformation,
+				{CFrame = CFrame.new(TargetPosition)}
+			)
+
+			MouseTpTween:Play()
+		end
+	end
+
+	local function GetDevidedPosition(Position)
+		local X = math.round(Position.X / 3)
+		local Y = math.round(Position.Y / 3)
+		local Z = math.round(Position.Z / 3)
+
+		return Vector3.new(X, Y, Z)
+	end
+	
+	local function FindNearestNpc(MaxDistance)
+		local MaxDistance = MaxDistance or math.huge
+		local NearestNpc = nil
+
+		task.spawn(function()
+			for i, v in next, CollectionService:GetTagged("BedwarsTeamUpgrader") do
+				local Distance = (v.Position - LocalPlayer.Character.PrimaryPart.Position).Magnitude
+
+				if Distance < MaxDistance then
+					MaxDistance = Distance
+					NearestNpc = v
+				end
+			end
+		end)
+
+		task.spawn(function()
+			for i, v in next, CollectionService:GetTagged("BedwarsItemShop") do
+				local Distance = (v.Position - LocalPlayer.Character.PrimaryPart.Position).Magnitude
+
+				if Distance < MaxDistance then
+					MaxDistance = Distance
+					NearestNpc = v		
+				end
+			end
+		end)
+
+		return NearestNpc
+	end
+	
+	local function FindNearestBed(MaxDistance, ExcludeLocalPlayer)
+		local NearestBedDistance = MaxDistance or math.huge
+		local NearestBed = nil
+
+		for i, v in next, CollectionService:GetTagged("bed") do
+			local BedColor = (v:FindFirstChild("Bed") and v:FindFirstChild("Bed").BrickColor or v:FindFirstChild("bed"):FindFirstChild("Bed") and v:FindFirstChild("bed"):FindFirstChild("Bed").BrickColor or nil)
+
+			if BedColor and (not ExcludeLocalPlayer or BedColor ~= LocalPlayer.Team.TeamColor) then
+				local Distance = (v.Position - LocalPlayer.Character.PrimaryPart.Position).Magnitude
+
+				if Distance < NearestBedDistance then
+					NearestBedDistance = Distance
+					NearestBed = v
+				end
+			end
+		end
+
+		return NearestBed, NearestBedDistance
+	end
+	
+	local function GetIronAmount(Player)
+		for i, v in next, LocalPlayer.Character:FindFirstChild("InventoryFolder").Value:GetChildren() do
+			if v.Name == "iron" then
+				return v:GetAttribute("Amount")
+			end
+		end
+		
+		return 0
+	end
+	
+	local function GetBlock()
+		for i, v in next, LocalPlayer.Character:FindFirstChild("InventoryFolder").Value:GetChildren() do
+			if v.Name:find("wool") then
+				return v.Name
+			end
+		end
+	end
+	
+	local NearestIronDrop = FindNearestIronDrop()
+	
+	if NearestIronDrop then
+		TeleportEfficiently(LocalPlayer.Character.PrimaryPart.Position, NearestIronDrop.Position + Vector3.new(0, 3, 0))
+	end
+	
+	task.wait(1)
+	
+	local NearestBed, NearestBedDistance = FindNearestBed(math.huge, true)
+	
+	if NearestBed then
+		local WoolStacksRequired = math.round(NearestBedDistance / 3 / 16)
+		
+		repeat task.wait() until GetIronAmount() >= WoolStacksRequired * 8
+		
+		local NearestNpc = FindNearestNpc()
+		
+		if NearestNpc then
+			TeleportEfficiently(LocalPlayer.Character.PrimaryPart.Position, NearestNpc.Position + Vector3.new(0, 3, 0))
+			
+			repeat
+				task.wait()
+				
+				BedwarsRemotes.BedwarsPurchaseItemRemote:InvokeServer(
+					{
+						shopItem = {
+							currency = "iron",
+							itemType = "wool_white",
+							amount = 16,
+							price = 8,
+							disabledInQueue = {
+								"mine_wars"
+							},
+							category = "Blocks"
+						},
+						shopId = NearestNpc.Name or ""
+					}
+				)
+			until not GetIronAmount() or GetIronAmount() < 8
+			
+			TeleportEfficiently(LocalPlayer.Character.PrimaryPart.Position, NearestNpc.Position + Vector3.new(0, 3, 0))	
+			
+			local LocalPlayerBed = FindNearestBed(math.huge, false)
+			
+			if LocalPlayerBed then
+				TeleportEfficiently(LocalPlayer.Character.PrimaryPart.Position, LocalPlayerBed.Position)
+
+				task.wait(1)
+
+				LocalPlayer.Character.Humanoid:MoveTo(NearestBed.Position)
+
+				task.spawn(function()
+					repeat
+						task.wait()
+
+						LocalPlayer.Character.Humanoid:MoveTo(NearestBed.Position)
+
+						for i = 1, 3 do
+							local BuildPosition = (LocalPlayer.Character.PrimaryPart.Position + ((LocalPlayer.Character.PrimaryPart.CFrame.LookVector * i) - Vector3.new(0, (LocalPlayer.Character.PrimaryPart.Size.Y / 2) + ((LocalPlayer.Character.Humanoid.HipHeight + (LocalPlayer.Character.Humanoid.HipHeight / 2))), 0)))
+							local RealBuildPosition = GetDevidedPosition(BuildPosition)
+							local Block = GetBlock()
+
+							if Block then
+								BedwarsRemotes.BlockPlacingRemote:InvokeServer({blockType = Block, blockData = 0, position = RealBuildPosition})
+							end
+						end
+					until not game
+				end)
+				
+				task.spawn(function()
+					repeat
+						task.wait()
+
+						
+					until not game
+				end)
+				
+				repeat task.wait() until GetMatchState() == 2
+				
+				TeleportToGame()
+			end
+		end
+	end
+end
+
+if AlSploitAutowinTable.State == 2 then
+	task.wait(1)
+	
+	if GetMatchState() == 2 then
+		TeleportToGame()
+	else
+		repeat task.wait() until GetMatchState() ~= 0
+		
+		Autowin()
+	end
+end
+
+if AlSploitAutowinTable.State == 1 then
+	task.wait(1)
+	
+	TeleportToEmptyGame()
+end
+
+if AlSploitAutowinTable.State == 0 then
+	task.wait(1)
+	
+	TeleportToGame()
+end
+
+shared.AlSploitAutowinTable = {State = 0}
+shared.AlSploitAutowinTable.State = 2
+
+print(shared.AlSploitAutowinTable.State)
+shared.AlSploitAutowinTable = nil
+
+--TeleportToEmptyGame()
+
+--print(TeleportService:GetLocalPlayerTeleportData()["AlSploit"])
+
+
+--[[{
+	["match"] = {
+		["queueType"] = "bedwars_lucky_block_to2",
+		["teamLeaderUserId"] = 9578474819,
+		["matchId"] = "123924ad-e89d-f78e-9454-1825b4c20000",
+		["accessCodeHash"] = " EbyWH1#+/\$^
+		jiV)#PS5%sc",
+},
+["party"] = {
+	["partyId"] = 0.48465673116143154,
+	["leaderUserId"] = 9578474819,
+	["partySize"] = 1,
+},
+}
+--]]
