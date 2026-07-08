@@ -1,4 +1,4 @@
-queue_on_teleport("loadstring(game:HttpGet('https://raw.githubusercontent.com/palachpalach18-tech/ai/refs/heads/main/test2'))()")
+queue_on_teleport("loadstring(game:HttpGet('https://raw.githubusercontent.com/palachpalach18-tech/ai/refs/heads/main/test3'))()")
 
 local ReplicatedStorageService = game:GetService("ReplicatedStorage")
 local CollectionService = game:GetService("CollectionService")
@@ -299,7 +299,7 @@ local function Autowin()
 						for i = 1, 10 do
 							task.wait(0.1)
 							
-							BedwarsRemotes.DamageBlockRemote:InvokeServer({
+							BedwarsRemotes.DamageBlockRemote:InvokeServer(
 								{
 									blockRef = {
 										blockPosition = GetDevidedPosition(FindNearestBed(math.huge, true).Position)
@@ -307,7 +307,7 @@ local function Autowin()
 									hitPosition = FindNearestBed(math.huge, true).Position,
 									hitNormal = Vector3.yAxis
 								}
-							})
+							)
 						end
 					until not game
 				end)
@@ -321,24 +321,29 @@ local function Autowin()
 end
 
 if AlSploitAutowinTable.State == 1 then
+	print("1")
 	task.wait(1)
 
 	TeleportToEmptyGame()
 end
 
 if AlSploitAutowinTable.State == 0 then
+	print("0")
 	task.wait(1)
 
 	TeleportToGame()
 end
 
 if AlSploitAutowinTable.State == 2 then
+	print("2")
 	task.wait(1)
 	
 	if GetMatchState() == 2 then
 		TeleportToGame()
 	else
 		repeat task.wait() until GetMatchState() ~= 0
+		
+		print("started")
 		
 		Autowin()
 	end
