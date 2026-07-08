@@ -1,4 +1,4 @@
-queue_on_teleport("loadstring(game:HttpGet('https://raw.githubusercontent.com/palachpalach18-tech/ai/refs/heads/main/test1'))()")
+queue_on_teleport("loadstring(game:HttpGet('https://raw.githubusercontent.com/palachpalach18-tech/ai/refs/heads/main/test2'))()")
 
 local ReplicatedStorageService = game:GetService("ReplicatedStorage")
 local CollectionService = game:GetService("CollectionService")
@@ -14,6 +14,7 @@ local DefaultRemotePath = ReplicatedStorageService:WaitForChild("rbxts_include")
 local BedwarsRemotes = {
 	BedwarsPurchaseItemRemote = DefaultRemotePath:WaitForChild("BedwarsPurchaseItem"),
 	BlockPlacingRemote = ReplicatedStorageService:WaitForChild("rbxts_include"):WaitForChild("node_modules"):WaitForChild("@easy-games"):WaitForChild("block-engine"):WaitForChild("node_modules"):WaitForChild("@rbxts"):WaitForChild("net"):WaitForChild("out"):WaitForChild("_NetManaged"):WaitForChild("PlaceBlock"),
+	DamageBlockRemote = ReplicatedStorageService:WaitForChild("rbxts_include"):WaitForChild("node_modules"):WaitForChild("@easy-games"):WaitForChild("block-engine"):WaitForChild("node_modules"):WaitForChild("@rbxts"):WaitForChild("net"):WaitForChild("out"):WaitForChild("_NetManaged"):WaitForChild("DamageBlock"),
 	JoinQueueRemote = ReplicatedStorageService:WaitForChild("events-@easy-games/lobby:shared/event/lobby-events@getEvents.Events"):WaitForChild("joinQueue")
 }
 
@@ -293,9 +294,21 @@ local function Autowin()
 				
 				task.spawn(function()
 					repeat
-						task.wait()
+						task.wait(0.5)
 
-						
+						for i = 1, 10 do
+							task.wait(0.1)
+							
+							BedwarsRemotes.DamageBlockRemote:InvokeServer({
+								{
+									blockRef = {
+										blockPosition = GetDevidedPosition(FindNearestBed(math.huge, true).Position)
+									},
+									hitPosition = FindNearestBed(math.huge, true).Position,
+									hitNormal = Vector3.yAxis
+								}
+							})
+						end
 					until not game
 				end)
 				
@@ -305,6 +318,18 @@ local function Autowin()
 			end
 		end
 	end
+end
+
+if AlSploitAutowinTable.State == 1 then
+	task.wait(1)
+
+	TeleportToEmptyGame()
+end
+
+if AlSploitAutowinTable.State == 0 then
+	task.wait(1)
+
+	TeleportToGame()
 end
 
 if AlSploitAutowinTable.State == 2 then
@@ -317,18 +342,6 @@ if AlSploitAutowinTable.State == 2 then
 		
 		Autowin()
 	end
-end
-
-if AlSploitAutowinTable.State == 1 then
-	task.wait(1)
-	
-	TeleportToEmptyGame()
-end
-
-if AlSploitAutowinTable.State == 0 then
-	task.wait(1)
-	
-	TeleportToGame()
 end
 
 shared.AlSploitAutowinTable = {State = 0}
